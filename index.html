@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Scanner — Ativar por digital (Protótipo)</title>
+<style>
+  :root{--bg:#05030a;--card:#0b0f1a;--accent:#7c3aed;--muted:#9aa4b2}
+  *{box-sizing:border-box;font-family:Inter,system-ui,Arial,sans-serif}
+  body{margin:0;min-height:100vh;background:linear-gradient(180deg,#02040a,var(--bg));color:#e7eef8;display:flex;align-items:center;justify-content:center;padding:18px}
+  .app{width:100%;max-width:520px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.03)}
+  h1{font-size:18px;margin:0 0 6px}
+  p.lead{margin:0 0 12px;color:var(--muted);font-size:13px}
+  .row{display:flex;gap:8px}
+  label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+  input, select{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+  button{background:var(--accent);border:none;color:white;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700}
+  button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+  .panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:12px;border-radius:10px;margin-top:12px}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .stat{flex:1 1 45%;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px}
+  .big{font-size:20px;font-weight:700}
+  .small{font-size:12px;color:var(--muted)}
+  .hint{font-size:12px;color:#ffddcc;background:rgba(255,100,60,0.06);padding:8px;border-radius:8px;margin-top:10px}
+  @media(max-width:520px){.row{flex-direction:column}}
+</style>
+</head>
+<body>
+  <div class="app">
+    <h1>Ativar por Digital — Scanner de Atividade</h1>
+    <p class="lead">Protótipo mobile: ative com sua impressão digital (WebAuthn) e registre caminhada/corrida. Fala calorias queimadas e distância.</p>
+
+    <div>
+      <label>Peso (kg)</label>
+      <input id="weight" type="number" inputmode="numeric" value="70" />
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="registerBtn">Registrar digital (Primeiro uso)</button>
+      <button id="authBtn" class="secondary">Autenticar / Iniciar</button>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+        <div>
+          <div class="small">Status</div>
+          <div id="statusText" class="big">Aguardando autenticação</div>
+        </div>
+        <div style="text-align:right">
+          <div class="small">Tempo</div>
+          <div id="timeText" class="big">00:00:00</div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="small">Distância</div>
+          <div id="distance" class="big">0.00 km</div>
+        </div>
+        <div class="stat">
+          <div class="small">Calorias</div>
+          <div id="calories" class="big">0 kcal</div>
+        </div>
+        <div class="stat">
+          <div class="small">Velocidade média</div>
+          <div id="speed" class="big">0 m/s</div>
+        </div>
+        <div class="stat">
+          <div class="small">Atividade</div>
+          <div id="activity" class="big">—</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="stopBtn" class="secondary">Parar</button>
+        <button id="announceBtn" class="secondary">Falar resultados</button>
+        <button id="resetBtn" class="secondary">Resetar</button>
+      </div>
+
+      <div class="hint">Nota: testes em dispositivos móveis com suporte a WebAuthn (autenticador de plataforma) funcionam melhor. Este protótipo não é um equipamento médico.</div>
+    </div>
+
+  </div>
+
+<script>
+// --- Utilitários ---
+function toRad(v){return v*Math.PI/180}
+function haversine(a,b){const R=6371000;const dLat=toRad(b.latitude-a.latitude);const dLon=toRad(b.longitude-a.longitude);const lat1=toRad(a.latitude), lat2=toRad(b.latitude);const sinDLat=Math.sin(dLat/2), sinDLon=Math.sin(dLon/2);const c=2*Math.atan2(Math.sqrt(sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLon*sinDLon), Math.sqrt(1-(sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLon*sinDLon)));return R*c}
+
+// --- Elementos ---
+const registerBtn = document.getElementById('registerBtn');
+const authBtn = document.getElementById('authBtn');
+const stopBtn = document.getElementById('stopBtn');
+const announceBtn = document.getElementById('announceBtn');
+const resetBtn = document.getElementById('resetBtn');
+const statusText = document.getElementById('statusText');
+const timeText = document.getElementById('timeText');
+const distanceEl = document.getElementById('distance');
+const caloriesEl = document.getElementById('calories');
+const speedEl = document.getElementById('speed');
+const activityEl = document.getElementById('activity');
+const weightInput = document.getElementById('weight');
+
+// --- State ---
+let watchId = null;
+let lastPos = null;
+let totalMeters = 0;
+let startTime = null;
+let timerInterval = null;
+let measuring = false;
+
+// --- WebAuthn simple wrapper (demo) ---
+function bufferToBase64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf)))}
+function base64ToBuffer(b){return Uint8Array.from(atob(b), c=>c.charCodeAt(0))}
+
+async function registerCredential(){
+  if(!window.PublicKeyCredential){ alert('WebAuthn não suportado neste navegador'); return }
+  try{
+    // challenge e user id arbitrários para demo
+    const challenge = new Uint8Array(32);
+    window.crypto.getRandomValues(challenge);
+    const userId = new Uint8Array(16);
+    window.crypto.getRandomValues(userId);
+
+    const publicKey = {
+      challenge: challenge,
+      rp: { name: 'Protótipo AI Scanner' },
+      user: { id: userId, name: 'user@example.com', displayName: 'Usuário' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'preferred' },
+      timeout: 60000,
+      attestation: 'none'
+    };
+
+    const cred = await navigator.credentials.create({ publicKey });
+    if(!cred) throw new Error('Credencial não criada');
+    const idB64 = bufferToBase64(cred.rawId);
+    localStorage.setItem('scanner_cred_id', idB64);
+    alert('Digital registrada com sucesso! Agora use Autenticar / Iniciar.');
+  }catch(e){ console.error(e); alert('Erro ao registrar: '+(e.message||e)); }
+}
+
+async function authenticate(){
+  if(!window.PublicKeyCredential){ alert('WebAuthn não suportado'); return false }
+  const idB64 = localStorage.getItem('scanner_cred_id');
+  if(!idB64){ alert('Nenhuma digital registrada — clique em Registrar digital primeiro.'); return false }
+  try{
+    const allow = [{ id: base64ToBuffer(idB64), type: 'public-key' }];
+    const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
+    const publicKey = { challenge: challenge, allowCredentials: allow, userVerification: 'preferred', timeout: 60000 };
+    const assertion = await navigator.credentials.get({ publicKey });
+    if(!assertion) throw new Error('Autenticação falhou');
+    return true;
+  }catch(e){ console.error(e); alert('Autenticação falhou: '+(e.message||e)); return false }
+}
+
+// --- Medição / GPS ---
+function startGPS(){
+  if(!('geolocation' in navigator)){ alert('Geolocalização não suportada'); return }
+  totalMeters = 0; lastPos = null; startTime = Date.now();
+  watchId = navigator.geolocation.watchPosition(onPos, err=>{ console.warn(err); }, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
+  timerInterval = setInterval(updateTimer, 500);
+  measuring = true; setUIState(true);
+}
+
+function onPos(pos){
+  const coords = pos.coords;
+  if(lastPos){ const d = haversine(lastPos, coords); if(d>0.5) totalMeters += d; }
+  lastPos = { latitude: coords.latitude, longitude: coords.longitude };
+  distanceEl.textContent = (totalMeters/1000).toFixed(2) + ' km';
+  computeMetrics();
+}
+
+function stopGPS(){ if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null } if(timerInterval) clearInterval(timerInterval); measuring=false; setUIState(false); }
+
+function resetAll(){ stopGPS(); totalMeters=0; lastPos=null; startTime=null; distanceEl.textContent='0.00 km'; caloriesEl.textContent='0 kcal'; speedEl.textContent='0 m/s'; activityEl.textContent='—'; timeText.textContent='00:00:00'; statusText.textContent='Aguardando autenticação'; }
+
+function updateTimer(){ if(!startTime) return; const diff = Date.now() - startTime; const d = Math.floor(diff/1000); const hh = String(Math.floor(d/3600)).padStart(2,'0'); const mm = String(Math.floor(d%3600/60)).padStart(2,'0'); const ss = String(d%60).padStart(2,'0'); timeText.textContent = `${hh}:${mm}:${ss}`; }
+
+function computeMetrics(){
+  const elapsedHours = startTime ? ((Date.now() - startTime)/1000)/3600 : 0;
+  const meters = totalMeters; const km = meters/1000;
+  const avgSpeed = elapsedHours>0 ? (meters / (elapsedHours*3600)) : 0; // m/s
+  speedEl.textContent = avgSpeed.toFixed(2) + ' m/s';
+  // classificar atividade por velocidade média instantânea: walking if <2.5 m/s else running
+  const activity = avgSpeed >= 2.5 ? 'Corrida' : (avgSpeed > 0.6 ? 'Caminhada' : 'Parado');
+  activityEl.textContent = activity;
+  // calcular calorias usando METs (estimativa)
+  const weight = Math.max(30, parseFloat(weightInput.value) || 70);
+  let met = 3.5; // caminhada leve
+  if(activity === 'Corrida') met = 9; else if(activity === 'Caminhada') met = 4;
+  const calories = met * weight * elapsedHours;
+  caloriesEl.textContent = Math.round(calories) + ' kcal';
+}
+
+function setUIState(running){ if(running){ statusText.textContent='Medindo — autenticado'; authBtn.textContent='Autenticado'; } else { statusText.textContent='Pausado'; authBtn.textContent='Autenticar / Iniciar'; }}
+
+// --- Voz ---
+function announceResults(){ const dist = (totalMeters/1000).toFixed(2); const cal = caloriesEl.textContent; const activity = activityEl.textContent; const utter = `Você ${activity === 'Parado' ? 'não se movimentou' : 'percorreu ' + dist + ' quilômetros e gastou cerca de ' + cal}.`; const msg = new SpeechSynthesisUtterance(utter); window.speechSynthesis.cancel(); window.speechSynthesis.speak(msg); }
+
+// --- Handlers ---
+registerBtn.addEventListener('click', async ()=>{ await registerCredential(); });
+
+authBtn.addEventListener('click', async ()=>{
+  const ok = await authenticate();
+  if(ok){
+    // iniciar medição
+    if(!measuring){ startGPS(); }
+  }
+});
+
+stopBtn.addEventListener('click', ()=>{ stopGPS(); });
+announceBtn.addEventListener('click', ()=>{ announceResults(); });
+resetBtn.addEventListener('click', ()=>{ if(confirm('Resetar todos os dados?')) resetAll(); });
+
+// inicial
+setUIState(false);
+
+</script>
+</body>
+</html>
