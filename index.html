@@ -3,45 +3,59 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Scanner — Ativar por digital (Protótipo)</title>
+<title>AI Runner — Protótipo Avançado</title>
 <style>
-  :root{--bg:#05030a;--card:#0b0f1a;--accent:#7c3aed;--muted:#9aa4b2}
+  :root{--bg:#07060a;--card:#0b0f18;--accent:#6d28d9;--muted:#9aa4b2}
   *{box-sizing:border-box;font-family:Inter,system-ui,Arial,sans-serif}
-  body{margin:0;min-height:100vh;background:linear-gradient(180deg,#02040a,var(--bg));color:#e7eef8;display:flex;align-items:center;justify-content:center;padding:18px}
-  .app{width:100%;max-width:520px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.03)}
-  h1{font-size:18px;margin:0 0 6px}
-  p.lead{margin:0 0 12px;color:var(--muted);font-size:13px}
-  .row{display:flex;gap:8px}
-  label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
-  input, select{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-  button{background:var(--accent);border:none;color:white;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700}
-  button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+  body{margin:0;min-height:100vh;background:linear-gradient(180deg,#02030a,var(--bg));color:#e7eef8;display:flex;align-items:center;justify-content:center;padding:18px}
+  .app{width:100%;max-width:900px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.03)}
+  h1{font-size:20px;margin:0 0 8px}
+  .row{display:flex;gap:8px;align-items:center}
+  input,select,button{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+  button{background:var(--accent);border:none;color:white;cursor:pointer;font-weight:700}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
   .panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:12px;border-radius:10px;margin-top:12px}
-  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-  .stat{flex:1 1 45%;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+  .stat{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px}
   .big{font-size:20px;font-weight:700}
   .small{font-size:12px;color:var(--muted)}
+  .controls{display:flex;gap:8px;margin-top:12px}
   .hint{font-size:12px;color:#ffddcc;background:rgba(255,100,60,0.06);padding:8px;border-radius:8px;margin-top:10px}
-  @media(max-width:520px){.row{flex-direction:column}}
+  .history{margin-top:12px}
+  pre{white-space:pre-wrap;font-size:13px}
+  @media(max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
   <div class="app">
-    <h1>Ativar por Digital — Scanner de Atividade</h1>
-    <p class="lead">Protótipo mobile: ative com sua impressão digital (WebAuthn) e registre caminhada/corrida. Fala calorias queimadas e distância.</p>
-
-    <div>
-      <label>Peso (kg)</label>
-      <input id="weight" type="number" inputmode="numeric" value="70" />
+    <h1>AI Runner — Protótipo Avançado</h1>
+    <div class="row" style="justify-content:space-between">
+      <div style="flex:1;min-width:220px">
+        <div class="small">Peso (kg)</div>
+        <input id="weight" type="number" value="70" />
+      </div>
+      <div style="width:12px"></div>
+      <div style="flex:1;min-width:220px">
+        <div class="small">Altura (cm) — usado para estimar passada</div>
+        <input id="height" type="number" value="175" />
+      </div>
+      <div style="width:12px"></div>
+      <div style="min-width:180px">
+        <div class="small">Modo</div>
+        <select id="mode"><option value="auto">Auto (GPS+Passos)</option><option value="gps">Só GPS</option><option value="steps">Só passos</option></select>
+      </div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button id="registerBtn">Registrar digital (Primeiro uso)</button>
-      <button id="authBtn" class="secondary">Autenticar / Iniciar</button>
+    <div class="controls">
+      <button id="registerBtn">Registrar digital</button>
+      <button id="authBtn" class="ghost">Autenticar / Iniciar</button>
+      <button id="pauseBtn" class="ghost">Pausar</button>
+      <button id="lockBtn" class="ghost">Manter tela ligada</button>
+      <button id="exportBtn" class="ghost">Exportar CSV</button>
     </div>
 
     <div class="panel">
-      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+      <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <div class="small">Status</div>
           <div id="statusText" class="big">Aguardando autenticação</div>
@@ -53,53 +67,73 @@
       </div>
 
       <div class="stats">
-        <div class="stat">
-          <div class="small">Distância</div>
-          <div id="distance" class="big">0.00 km</div>
-        </div>
-        <div class="stat">
-          <div class="small">Calorias</div>
-          <div id="calories" class="big">0 kcal</div>
-        </div>
-        <div class="stat">
-          <div class="small">Velocidade média</div>
-          <div id="speed" class="big">0 m/s</div>
-        </div>
-        <div class="stat">
-          <div class="small">Atividade</div>
-          <div id="activity" class="big">—</div>
-        </div>
+        <div class="stat"><div class="small">Distância</div><div id="distance" class="big">0.00 km</div></div>
+        <div class="stat"><div class="small">Calorias</div><div id="calories" class="big">0 kcal</div></div>
+        <div class="stat"><div class="small">Pace (min/km)</div><div id="pace" class="big">00:00</div></div>
+        <div class="stat"><div class="small">Velocidade média</div><div id="speed" class="big">0 m/s</div></div>
       </div>
 
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button id="stopBtn" class="secondary">Parar</button>
-        <button id="announceBtn" class="secondary">Falar resultados</button>
-        <button id="resetBtn" class="secondary">Resetar</button>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
+        <div class="small">GPS acc:</div><div id="gpsAcc" class="small">—</div>
+        <div style="width:8px"></div>
+        <div class="small">Passos:</div><div id="stepsCount" class="small">0</div>
+        <div style="flex:1"></div>
+        <button id="announceBtn" class="ghost">Falar resultados</button>
+        <button id="resetBtn" class="ghost">Resetar</button>
       </div>
 
-      <div class="hint">Nota: testes em dispositivos móveis com suporte a WebAuthn (autenticador de plataforma) funcionam melhor. Este protótipo não é um equipamento médico.</div>
+      <div class="hint">Este é um protótipo. Para melhores resultados, abra no celular, permita sensores (GPS e Movimento) e não minimize o navegador. Wake Lock ajuda a manter o GPS funcionando.</div>
+    </div>
+
+    <div class="history panel">
+      <div style="display:flex;justify-content:space-between;align-items:center"><strong>Histórico de sessões</strong><div><button id="clearHistory" class="ghost">Limpar</button></div></div>
+      <div id="historyList" style="margin-top:8px;max-height:220px;overflow:auto;background:rgba(255,255,255,0.01);padding:8px;border-radius:8px"></div>
     </div>
 
   </div>
 
 <script>
-// --- Utilitários ---
-function toRad(v){return v*Math.PI/180}
-function haversine(a,b){const R=6371000;const dLat=toRad(b.latitude-a.latitude);const dLon=toRad(b.longitude-a.longitude);const lat1=toRad(a.latitude), lat2=toRad(b.latitude);const sinDLat=Math.sin(dLat/2), sinDLon=Math.sin(dLon/2);const c=2*Math.atan2(Math.sqrt(sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLon*sinDLon), Math.sqrt(1-(sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLon*sinDLon)));return R*c}
+/*
+  Recursos implementados:
+  - WebAuthn (registro + autenticação de plataforma) para ativar o app
+  - GPS com filtro Kalman 2D para suavizar coordenadas
+  - Step detector via DeviceMotion (picos na magnitude) com contagem de passos
+  - Fusão GPS + passos: usa GPS quando disponível/preciso; usa passos quando GPS ruim
+  - Wake Lock API para evitar que a tela durma
+  - Histórico de sessões em localStorage e export CSV
+  - Cálculo de calorias aproximado (METs) e pace (min/km)
 
-// --- Elementos ---
+  Observações:
+  - iOS Safari pede permissão para Motion (DeviceMotionEvent.requestPermission()) com interação do usuário.
+  - Wake Lock funciona em navegadores modernos (Chrome Android). iOS tem limitações.
+*/
+
+// --- Utilitários ---
+function nowMs(){return Date.now()}
+function toRad(v){return v*Math.PI/180}
+function haversine(a,b){const R=6371000;const dLat=toRad(b.latitude-a.latitude);const dLon=toRad(b.longitude-a.longitude);const lat1=toRad(a.latitude), lat2=toRad(b.latitude);const sinDLat=Math.sin(dLat/2), sinDLon=Math.sin(dLon/2);const c=2*Math.atan2(Math.sqrt(sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLon*sinDLon), Math.sqrt(1 - (sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLon*sinDLon)));return R*c}
+
+// --- Elements ---
 const registerBtn = document.getElementById('registerBtn');
 const authBtn = document.getElementById('authBtn');
-const stopBtn = document.getElementById('stopBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const lockBtn = document.getElementById('lockBtn');
+const exportBtn = document.getElementById('exportBtn');
 const announceBtn = document.getElementById('announceBtn');
+const clearHistoryBtn = document.getElementById('clearHistory');
 const resetBtn = document.getElementById('resetBtn');
 const statusText = document.getElementById('statusText');
 const timeText = document.getElementById('timeText');
 const distanceEl = document.getElementById('distance');
 const caloriesEl = document.getElementById('calories');
+const paceEl = document.getElementById('pace');
 const speedEl = document.getElementById('speed');
-const activityEl = document.getElementById('activity');
+const gpsAccEl = document.getElementById('gpsAcc');
+const stepsCountEl = document.getElementById('stepsCount');
+const historyListEl = document.getElementById('historyList');
 const weightInput = document.getElementById('weight');
+const heightInput = document.getElementById('height');
+const modeSelect = document.getElementById('mode');
 
 // --- State ---
 let watchId = null;
@@ -107,114 +141,219 @@ let lastPos = null;
 let totalMeters = 0;
 let startTime = null;
 let timerInterval = null;
-let measuring = false;
+let running = false;
+let paused = false;
+let wakeLock = null;
+let steps = 0;
+let lastStepTime = 0;
+let stepListenersBound = false;
+let sessionData = null; // object for current session
 
-// --- WebAuthn simple wrapper (demo) ---
-function bufferToBase64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf)))}
-function base64ToBuffer(b){return Uint8Array.from(atob(b), c=>c.charCodeAt(0))}
-
-async function registerCredential(){
-  if(!window.PublicKeyCredential){ alert('WebAuthn não suportado neste navegador'); return }
-  try{
-    // challenge e user id arbitrários para demo
-    const challenge = new Uint8Array(32);
-    window.crypto.getRandomValues(challenge);
-    const userId = new Uint8Array(16);
-    window.crypto.getRandomValues(userId);
-
-    const publicKey = {
-      challenge: challenge,
-      rp: { name: 'Protótipo AI Scanner' },
-      user: { id: userId, name: 'user@example.com', displayName: 'Usuário' },
-      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'preferred' },
-      timeout: 60000,
-      attestation: 'none'
-    };
-
-    const cred = await navigator.credentials.create({ publicKey });
-    if(!cred) throw new Error('Credencial não criada');
-    const idB64 = bufferToBase64(cred.rawId);
-    localStorage.setItem('scanner_cred_id', idB64);
-    alert('Digital registrada com sucesso! Agora use Autenticar / Iniciar.');
-  }catch(e){ console.error(e); alert('Erro ao registrar: '+(e.message||e)); }
+// --- Kalman filter simple 2D implementation ---
+function Kalman2D(){
+  this.x = 0; this.y = 0; // position
+  this.P = [[1,0],[0,1]]; // covariance
+  this.Q = 1e-3; // process noise
+  this.R = 4; // measurement noise (m^2)
+  this.initialized = false;
+}
+Kalman2D.prototype.set = function(lat,lon){ this.x = lat; this.y = lon; this.P = [[1,0],[0,1]]; this.initialized = true }
+Kalman2D.prototype.update = function(measLat, measLon){
+  if(!this.initialized){ this.set(measLat,measLon); return {lat:measLat,lon:measLon} }
+  // predict step: assume constant position -> P += Q
+  this.P[0][0] += this.Q; this.P[1][1] += this.Q;
+  // measurement
+  const z = [measLat, measLon];
+  // compute Kalman gain K = P * (P + R)^-1  (R scalar applied to diagonal)
+  const S00 = this.P[0][0] + this.R; const S01 = this.P[0][1]; const S10 = this.P[1][0]; const S11 = this.P[1][1] + this.R;
+  const det = S00*S11 - S01*S10; if(Math.abs(det) < 1e-12) return {lat:this.x,lon:this.y};
+  const invS = [[S11/det, -S01/det],[-S10/det, S00/det]];
+  const K0 = this.P[0][0]*invS[0][0] + this.P[0][1]*invS[1][0];
+  const K1 = this.P[1][0]*invS[0][0] + this.P[1][1]*invS[1][0];
+  const K2 = this.P[0][0]*invS[0][1] + this.P[0][1]*invS[1][1];
+  const K3 = this.P[1][0]*invS[0][1] + this.P[1][1]*invS[1][1];
+  // innovation
+  const y0 = z[0] - this.x; const y1 = z[1] - this.y;
+  // update state
+  this.x += K0 * y0 + K2 * y1;
+  this.y += K1 * y0 + K3 * y1;
+  // update covariance P = (I - K)P
+  const I_K = [[1-K0, -K2],[-K1, 1-K3]];
+  const P00 = I_K[0][0]*this.P[0][0] + I_K[0][1]*this.P[1][0];
+  const P01 = I_K[0][0]*this.P[0][1] + I_K[0][1]*this.P[1][1];
+  const P10 = I_K[1][0]*this.P[0][0] + I_K[1][1]*this.P[1][0];
+  const P11 = I_K[1][0]*this.P[0][1] + I_K[1][1]*this.P[1][1];
+  this.P = [[P00,P01],[P10,P11]];
+  return {lat:this.x, lon:this.y};
 }
 
-async function authenticate(){
+const kalman = new Kalman2D();
+
+// --- WebAuthn helpers ---
+function bufToB64(buf){return btoa(String.fromCharCode(...new Uint8Array(buf)))}
+function b64ToBuf(b){return Uint8Array.from(atob(b), c=>c.charCodeAt(0))}
+
+async function registerCred(){
+  if(!window.PublicKeyCredential){ alert('WebAuthn não suportado'); return }
+  try{
+    const challenge = new Uint8Array(32); crypto.getRandomValues(challenge);
+    const userId = new Uint8Array(16); crypto.getRandomValues(userId);
+    const publicKey = { challenge, rp:{name:'AI Runner'}, user:{id:userId, name:'user@example.com', displayName:'Usuário'}, pubKeyCredParams:[{type:'public-key',alg:-7}], authenticatorSelection:{authenticatorAttachment:'platform', userVerification:'preferred'}, timeout:60000, attestation:'none' };
+    const cred = await navigator.credentials.create({publicKey});
+    if(!cred) throw new Error('Não criado');
+    localStorage.setItem('ai_runner_cred', bufToB64(cred.rawId));
+    alert('Digital registrada! Agora clique em Autenticar / Iniciar.');
+  }catch(e){console.error(e);alert('Erro registrar: '+(e.message||e))}
+}
+
+async function authenticateCred(){
   if(!window.PublicKeyCredential){ alert('WebAuthn não suportado'); return false }
-  const idB64 = localStorage.getItem('scanner_cred_id');
-  if(!idB64){ alert('Nenhuma digital registrada — clique em Registrar digital primeiro.'); return false }
+  const id = localStorage.getItem('ai_runner_cred'); if(!id){ alert('Nenhuma digital registrada'); return false }
   try{
-    const allow = [{ id: base64ToBuffer(idB64), type: 'public-key' }];
-    const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-    const publicKey = { challenge: challenge, allowCredentials: allow, userVerification: 'preferred', timeout: 60000 };
-    const assertion = await navigator.credentials.get({ publicKey });
-    if(!assertion) throw new Error('Autenticação falhou');
+    const allow = [{id:b64ToBuf(id), type:'public-key'}];
+    const challenge = new Uint8Array(32); crypto.getRandomValues(challenge);
+    const publicKey = {challenge, allowCredentials:allow, userVerification:'preferred', timeout:60000};
+    const assertion = await navigator.credentials.get({publicKey}); if(!assertion) throw new Error('Falha');
     return true;
-  }catch(e){ console.error(e); alert('Autenticação falhou: '+(e.message||e)); return false }
+  }catch(e){console.error(e); alert('Falha autenticação: '+(e.message||e)); return false }
 }
 
-// --- Medição / GPS ---
-function startGPS(){
-  if(!('geolocation' in navigator)){ alert('Geolocalização não suportada'); return }
-  totalMeters = 0; lastPos = null; startTime = Date.now();
-  watchId = navigator.geolocation.watchPosition(onPos, err=>{ console.warn(err); }, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
-  timerInterval = setInterval(updateTimer, 500);
-  measuring = true; setUIState(true);
+// --- Wake Lock ---
+async function requestWakeLock(){ try{ if('wakeLock' in navigator){ wakeLock = await navigator.wakeLock.request('screen'); lockBtn.textContent='Tela bloqueada'; wakeLock.addEventListener('release', ()=>{ lockBtn.textContent='Manter tela ligada' }); } else alert('Wake Lock não suportado no navegador'); }catch(e){console.warn('WakeLock erro',e);}}
+async function releaseWakeLock(){ try{ if(wakeLock){ await wakeLock.release(); wakeLock=null; lockBtn.textContent='Manter tela ligada'; } }catch(e){console.warn(e);} }
+
+// --- Steps detection (simple peak detector) ---
+let accWindow = []; // recent magnitude samples
+function handleMotion(e){
+  const acc = e.accelerationIncludingGravity || e.acceleration || {x:0,y:0,z:0};
+  const mag = Math.sqrt((acc.x||0)**2 + (acc.y||0)**2 + (acc.z||0)**2);
+  const t = Date.now();
+  accWindow.push({t,mag}); if(accWindow.length>50) accWindow.shift();
+  // simple high-pass by subtracting short-term mean
+  const mean = accWindow.reduce((s,x)=>s+x.mag,0)/accWindow.length;
+  const val = mag - mean;
+  // detect peaks
+  const TH = 1.0; // threshold — may require tuning per device
+  if(val > TH){
+    // prevent double-counting
+    if(t - lastStepTime > 300){ // 300ms debounce (~200 steps/min max)
+      steps++; lastStepTime = t; stepsCountEl.textContent = steps;
+      // add to session distance if using step-only or fusion
+      if(sessionData && (modeSelect.value === 'steps' || modeSelect.value === 'auto')){
+        const stride = estimateStride(); sessionData.stepMeters += stride; totalMeters += stride; distanceEl.textContent = (totalMeters/1000).toFixed(2)+' km';
+      }
+    }
+  }
 }
 
-function onPos(pos){
-  const coords = pos.coords;
-  if(lastPos){ const d = haversine(lastPos, coords); if(d>0.5) totalMeters += d; }
-  lastPos = { latitude: coords.latitude, longitude: coords.longitude };
-  distanceEl.textContent = (totalMeters/1000).toFixed(2) + ' km';
-  computeMetrics();
+function enableMotion(){ if(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
+  // iOS 13+ requires permission
+  DeviceMotionEvent.requestPermission().then(res => { if(res==='granted'){ window.addEventListener('devicemotion', handleMotion); stepListenersBound=true } else alert('Permissão de movimento negada') }).catch(err=>{console.warn(err); alert('Erro pedindo permissão de movimento') });
+ } else { window.addEventListener('devicemotion', handleMotion); stepListenersBound=true }
+}
+function disableMotion(){ if(stepListenersBound){ window.removeEventListener('devicemotion', handleMotion); stepListenersBound=false } }
+
+function estimateStride(){
+  // estima stride (metros) baseado na altura e se está correndo ou caminhando
+  const h = Math.max(120, parseFloat(heightInput.value)||170)/100; // m
+  let base = h * 0.415; // caminhada ~41.5% da altura
+  // se velocidade alta, aumenta
+  const avgSpeed = computeAvgSpeed();
+  if(avgSpeed >= 2.5) base = h * 0.65; // corrida
+  return base;
 }
 
-function stopGPS(){ if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null } if(timerInterval) clearInterval(timerInterval); measuring=false; setUIState(false); }
-
-function resetAll(){ stopGPS(); totalMeters=0; lastPos=null; startTime=null; distanceEl.textContent='0.00 km'; caloriesEl.textContent='0 kcal'; speedEl.textContent='0 m/s'; activityEl.textContent='—'; timeText.textContent='00:00:00'; statusText.textContent='Aguardando autenticação'; }
-
-function updateTimer(){ if(!startTime) return; const diff = Date.now() - startTime; const d = Math.floor(diff/1000); const hh = String(Math.floor(d/3600)).padStart(2,'0'); const mm = String(Math.floor(d%3600/60)).padStart(2,'0'); const ss = String(d%60).padStart(2,'0'); timeText.textContent = `${hh}:${mm}:${ss}`; }
-
-function computeMetrics(){
-  const elapsedHours = startTime ? ((Date.now() - startTime)/1000)/3600 : 0;
-  const meters = totalMeters; const km = meters/1000;
-  const avgSpeed = elapsedHours>0 ? (meters / (elapsedHours*3600)) : 0; // m/s
-  speedEl.textContent = avgSpeed.toFixed(2) + ' m/s';
-  // classificar atividade por velocidade média instantânea: walking if <2.5 m/s else running
-  const activity = avgSpeed >= 2.5 ? 'Corrida' : (avgSpeed > 0.6 ? 'Caminhada' : 'Parado');
-  activityEl.textContent = activity;
-  // calcular calorias usando METs (estimativa)
-  const weight = Math.max(30, parseFloat(weightInput.value) || 70);
-  let met = 3.5; // caminhada leve
-  if(activity === 'Corrida') met = 9; else if(activity === 'Caminhada') met = 4;
-  const calories = met * weight * elapsedHours;
-  caloriesEl.textContent = Math.round(calories) + ' kcal';
+// --- GPS handling with Kalman smoothing and fusion ---
+function onPosition(pos){
+  const coords = pos.coords; gpsAccEl.textContent = coords.accuracy ? coords.accuracy.toFixed(1)+' m' : '—';
+  const meas = {latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy};
+  const smooth = kalman.update(meas.latitude, meas.longitude);
+  // compute distance between lastPos (smoothed) and new smoothed
+  if(lastPos){
+    const last = lastPos; const cur = smooth;
+    // convert smoothed lat/lon into meters via haversine
+    const d = haversine({latitude:last.x, longitude:last.y},{latitude:cur.lat, longitude:cur.lon});
+    // if measurement accuracy is reasonable, use GPS delta, else rely on step distance
+    if(coords.accuracy < 20 || modeSelect.value === 'gps'){
+      if(d > 0.5){ totalMeters += d; sessionData.gpsMeters += d; }
+    } else {
+      // GPS poor: if steps are being detected, rely on step distance (already added in step handler)
+      // else we can still add small d
+      if(d > 3 && modeSelect.value !== 'steps'){ totalMeters += d; sessionData.gpsMeters += d }
+    }
+    distanceEl.textContent = (totalMeters/1000).toFixed(2)+' km';
+  } else {
+    // first fix
+    kalman.set(meas.latitude, meas.longitude);
+  }
+  lastPos = {x:smooth.lat, y:smooth.lon};
 }
 
-function setUIState(running){ if(running){ statusText.textContent='Medindo — autenticado'; authBtn.textContent='Autenticado'; } else { statusText.textContent='Pausado'; authBtn.textContent='Autenticar / Iniciar'; }}
+function onPositionError(err){ console.warn('GPS err',err); gpsAccEl.textContent = 'Erro'; }
 
-// --- Voz ---
-function announceResults(){ const dist = (totalMeters/1000).toFixed(2); const cal = caloriesEl.textContent; const activity = activityEl.textContent; const utter = `Você ${activity === 'Parado' ? 'não se movimentou' : 'percorreu ' + dist + ' quilômetros e gastou cerca de ' + cal}.`; const msg = new SpeechSynthesisUtterance(utter); window.speechSynthesis.cancel(); window.speechSynthesis.speak(msg); }
+function startGPS(){ if(!('geolocation' in navigator)){ alert('Geolocalização não suportada'); return }
+  totalMeters = 0; lastPos = null; steps = 0; stepsCountEl.textContent = steps; sessionData = {start:Date.now(), gpsMeters:0, stepMeters:0, steps:0, weight:parseFloat(weightInput.value)||70, height:parseFloat(heightInput.value)||170 };
+  watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {enableHighAccuracy:true, maximumAge:1000, timeout:10000});
+  startTime = Date.now(); timerInterval = setInterval(tick,500); running=true; paused=false; setStatus('Medindo — autenticado');
+}
 
-// --- Handlers ---
-registerBtn.addEventListener('click', async ()=>{ await registerCredential(); });
+function stopGPS(){ if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null } if(timerInterval) clearInterval(timerInterval); running=false; paused=false; setStatus('Pausado'); // finalize session
+  if(sessionData){ sessionData.end = Date.now(); sessionData.duration = (sessionData.end - sessionData.start)/1000; sessionData.distance_km = (totalMeters/1000); sessionData.calories = computeCalories(); sessionData.steps = steps; saveSession(sessionData); sessionData=null; renderHistory(); }
+}
+
+// --- Metrics ---
+function computeAvgSpeed(){ const elapsedSec = startTime ? (Date.now() - startTime)/1000 : 0; return elapsedSec>0 ? (totalMeters / elapsedSec) : 0; }
+function computePace(){ const km = totalMeters/1000; const elapsedSec = startTime ? (Date.now() - startTime)/1000 : 0; if(km<=0.0001) return 0; return (elapsedSec/60)/km; } // min per km
+function computeCalories(){ const hours = startTime ? (Date.now()-startTime)/1000/3600 : 0; const weight = Math.max(30, parseFloat(weightInput.value)||70); const activity = computeAvgSpeed()>=2.5 ? 'run' : (computeAvgSpeed()>0.6 ? 'walk' : 'rest'); let met = 1.5; if(activity==='walk') met = 4; if(activity==='run') met = 9; return Math.round(met * weight * hours); }
+
+function tick(){ // update UI
+  const elapsed = startTime ? Math.floor((Date.now()-startTime)/1000) : 0; const hh = String(Math.floor(elapsed/3600)).padStart(2,'0'); const mm = String(Math.floor(elapsed%3600/60)).padStart(2,'0'); const ss = String(elapsed%60).padStart(2,'0'); timeText.textContent = `${hh}:${mm}:${ss}`;
+  distanceEl.textContent = (totalMeters/1000).toFixed(2) + ' km'; caloriesEl.textContent = computeCalories() + ' kcal';
+  const pace = computePace(); paceEl.textContent = pace>0 ? `${Math.floor(pace)}:${String(Math.round((pace%1)*60)).padStart(2,'0')}` : '00:00';
+  speedEl.textContent = computeAvgSpeed().toFixed(2) + ' m/s';
+}
+
+function setStatus(s){ statusText.textContent = s }
+
+// --- History storage ---
+function saveSession(sess){ const history = JSON.parse(localStorage.getItem('ai_runner_history')||'[]'); history.unshift(sess); localStorage.setItem('ai_runner_history', JSON.stringify(history)); }
+function renderHistory(){ const history = JSON.parse(localStorage.getItem('ai_runner_history')||'[]'); if(history.length===0){ historyListEl.innerHTML='<div class="small">Sem sessões salvas</div>'; return } historyListEl.innerHTML=''; history.forEach((s,idx)=>{ const el = document.createElement('div'); el.style.padding='8px'; el.style.borderBottom='1px solid rgba(255,255,255,0.02)'; el.innerHTML = `<strong>${new Date(s.start).toLocaleString()}</strong> — ${s.distance_km.toFixed(2)} km • ${s.calories} kcal • ${s.steps||0} passos`; historyListEl.appendChild(el) }); }
+function clearHistory(){ if(confirm('Limpar histórico?')){ localStorage.removeItem('ai_runner_history'); renderHistory(); } }
+
+// --- Export CSV ---
+function exportCSV(){ const history = JSON.parse(localStorage.getItem('ai_runner_history')||'[]'); if(history.length===0){ alert('Nenhuma sessão para exportar'); return } let csv = 'start,end,duration_s,distance_km,calories,steps\n'; history.forEach(s=>{ csv += `${s.start},${s.end},${Math.round(s.duration)},${s.distance_km.toFixed(3)},${s.calories},${s.steps||0}\n`; }); const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'ai_runner_history.csv'; a.click(); URL.revokeObjectURL(url); }
+
+// --- Voice announce ---
+function announce(){ const dist = (totalMeters/1000).toFixed(2); const cal = computeCalories(); const paceVal = computePace(); const paceStr = paceVal>0 ? `${Math.floor(paceVal)} minutos e ${Math.round((paceVal%1)*60)} segundos por quilômetro` : '—'; const utter = `Você percorreu ${dist} quilômetros, calorias estimadas ${cal} quilocalorias. Pace médio: ${paceStr}.`; const msg = new SpeechSynthesisUtterance(utter); speechSynthesis.cancel(); speechSynthesis.speak(msg); }
+
+// --- Event handlers ---
+registerBtn.addEventListener('click', ()=>registerCred());
 
 authBtn.addEventListener('click', async ()=>{
-  const ok = await authenticate();
-  if(ok){
-    // iniciar medição
-    if(!measuring){ startGPS(); }
-  }
+  const ok = await authenticateCred(); if(!ok) return; // stop if fail
+  // ask for motion permission if needed
+  if(!stepListenersBound) enableMotion();
+  if(!running){ startGPS(); }
 });
 
-stopBtn.addEventListener('click', ()=>{ stopGPS(); });
-announceBtn.addEventListener('click', ()=>{ announceResults(); });
-resetBtn.addEventListener('click', ()=>{ if(confirm('Resetar todos os dados?')) resetAll(); });
+pauseBtn.addEventListener('click', ()=>{ if(!running) return; if(!paused){ // pause
+  paused = true; if(watchId){ navigator.geolocation.clearWatch(watchId); } if(timerInterval) clearInterval(timerInterval); disableMotion(); pauseBtn.textContent='Retomar'; setStatus('Pausado'); } else { // resume
+  paused = false; // resume gps
+  watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {enableHighAccuracy:true, maximumAge:1000, timeout:10000}); timerInterval = setInterval(tick,500); if(!stepListenersBound) enableMotion(); pauseBtn.textContent='Pausar'; setStatus('Medindo — autenticado'); } });
 
-// inicial
-setUIState(false);
+lockBtn.addEventListener('click', async ()=>{ if(!wakeLock){ await requestWakeLock(); } else { await releaseWakeLock(); }});
+
+exportBtn.addEventListener('click', ()=>{ exportCSV(); });
+
+announceBtn.addEventListener('click', ()=>{ announce(); });
+
+clearHistoryBtn.addEventListener('click', ()=>{ clearHistory(); });
+resetBtn.addEventListener('click', ()=>{ if(confirm('Resetar sessão atual?')){ stopGPS(); resetUI(); } });
+
+function resetUI(){ totalMeters=0; steps=0; startTime=null; distanceEl.textContent='0.00 km'; caloriesEl.textContent='0 kcal'; paceEl.textContent='00:00'; speedEl.textContent='0 m/s'; timeText.textContent='00:00:00'; stepsCountEl.textContent='0'; }
+
+// init
+renderHistory();
 
 </script>
 </body>
